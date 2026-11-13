@@ -457,6 +457,42 @@ impl Drop for App {
     }
 }
 
+const LIVE_GREEN: egui::Color32 = egui::Color32::from_rgb(34, 160, 70);
+const MUTED_RED: egui::Color32 = egui::Color32::from_rgb(200, 45, 45);
+
+fn section_heading(ui: &mut egui::Ui, title: &str, muted: bool) {
+    let color = if muted { MUTED_RED } else { LIVE_GREEN };
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("●").size(28.0).color(color));
+        ui.heading(title);
+    });
+}
+
+/// Big, VR-friendly volume slider + percentage + LIVE/MUTED toggle button.
+fn volume_row(ui: &mut egui::Ui, gain: &mut f32, mute: &mut bool) {
+    ui.horizontal(|ui| {
+        let btn_w = 130.0;
+        let pct_w = 64.0;
+        let height = 54.0;
+        let gaps = 3.0 * ui.spacing().item_spacing.x;
+        ui.spacing_mut().slider_width = (ui.available_width() - btn_w - pct_w - gaps).max(80.0);
+        ui.add(egui::Slider::new(gain, 0.0..=200.0).show_value(false).trailing_fill(true));
+        ui.add_sized(
+            [pct_w, height],
+            egui::Label::new(egui::RichText::new(format!("{:.0}%", *gain)).size(22.0)),
+        );
+        let (text, color) = if *mute { ("MUTED", MUTED_RED) } else { ("LIVE", LIVE_GREEN) };
+        let button = egui::Button::new(
+            egui::RichText::new(text).size(24.0).strong().color(egui::Color32::WHITE),
+        )
+        .fill(color)
+        .min_size(egui::vec2(btn_w, height));
+        if ui.add(button).clicked() {
+            *mute = !*mute;
+        }
+    });
+}
+
 fn status_line(ui: &mut egui::Ui, label: &str, text: &str) {
     if !text.is_empty() {
         ui.small(format!("{label}: {text}"));
@@ -473,7 +509,7 @@ impl eframe::App for App {
         let s = &mut self.settings;
         egui::CentralPanel::default().show(ui, |ui| {
             // ── Microphone ──
-            ui.heading("Microphone");
+            section_heading(ui, "Microphone", s.mic_mute);
             let mic_label = if s.mic_id.is_empty() {
                 "— none —".to_string()
             } else if let Some(m) = lists.mics.iter().find(|m| m.0 == s.mic_id) {
@@ -496,10 +532,7 @@ impl eframe::App for App {
                         }
                     }
                 });
-            ui.horizontal(|ui| {
-                ui.add(egui::Slider::new(&mut s.mic_gain, 0.0..=200.0).suffix("%"));
-                ui.checkbox(&mut s.mic_mute, "Mute");
-            });
+            volume_row(ui, &mut s.mic_gain, &mut s.mic_mute);
             status_line(ui, "mic", &lock(&self.sh.mic.status));
 
             ui.add_space(14.0);
@@ -507,7 +540,7 @@ impl eframe::App for App {
             ui.add_space(8.0);
 
             // ── Program audio ──
-            ui.heading("Program audio");
+            section_heading(ui, "Program audio", s.app_mute);
             let running = lists.procs.iter().any(|p| p.0 == s.app_name);
             let app_label = if s.app_name.is_empty() {
                 "— none —".to_string()
@@ -530,10 +563,7 @@ impl eframe::App for App {
                     }
                 });
             ui.small("Only apps that have played audio show up in this list.");
-            ui.horizontal(|ui| {
-                ui.add(egui::Slider::new(&mut s.app_gain, 0.0..=200.0).suffix("%"));
-                ui.checkbox(&mut s.app_mute, "Mute");
-            });
+            volume_row(ui, &mut s.app_gain, &mut s.app_mute);
             status_line(ui, "program", &lock(&self.sh.app.status));
 
             ui.add_space(14.0);
@@ -559,8 +589,19 @@ impl eframe::App for App {
 
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([400.0, 330.0]),
+        viewport: egui::ViewportBuilder::default().with_inner_size([680.0, 720.0]),
         ..Default::default()
     };
-    eframe::run_native("Cable Mixer", options, Box::new(|_cc| Ok(Box::new(App::new()))))
+    eframe::run_native("Cable Mixer", options, Box::new(|cc| {
+            cc.egui_ctx.set_zoom_factor(1.5); // Ctrl +/- also zooms at runtime
+            cc.egui_ctx.all_styles_mut(|style| {
+                for (_, font) in style.text_styles.iter_mut() {
+                    font.size *= 1.2;
+                }
+                style.spacing.interact_size.y = 44.0;
+                style.spacing.slider_rail_height = 16.0;
+                style.spacing.item_spacing = egui::vec2(10.0, 10.0);
+            });
+            Ok(Box::new(App::new()))
+        }))
 }
