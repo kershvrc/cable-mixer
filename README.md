@@ -7,9 +7,8 @@ Voicemeeter, but easy. Mix **one microphone** and **one program's audio** into
 - Captures only the chosen program's audio (Windows per-process loopback)
 - Remembers your last choices and re-attaches to the program when it starts
 - Low latency (roughly 20-40 ms) using event-driven WASAPI
-<img width="402" height="362" alt="Screenshot 2026-11-13 011210" src="https://github.com/user-attachments/assets/45c380b1-75db-41ce-a857-a44553a0b7b2" />
 
-
+<img src="docs/screenshot.png" alt="Cable Mixer showing microphone and program audio controls" width="420">
 ## Usage
 
 1. Install [VB-Cable](https://vb-audio.com/Cable/) (reboot afterwards).
